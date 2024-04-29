@@ -51,7 +51,7 @@ EspMQTTClient client(
 //}";
 
 // Json mqtt template for home assistant auto discovery of mobius devices
-char *jsonDiscoveryDevice = "{\"name\": \"%s\",\
+char *jsonDiscoveryDevice = "{\"name\": \"Current Scene\",\
   \"unique_id\": \"%s\",\
   \"area\": \"reef\",\
   \"icon\": \"mdi:pump\",\
@@ -61,8 +61,14 @@ char *jsonDiscoveryDevice = "{\"name\": \"%s\",\
   \"identifiers\" : [  \"%s\" ],\
   \"name\": \"%s\",\
   \"model\": \"%s\",\
-  \"manufacturer\": \"%s\"}\
+  \"manufacturer\": \"%s\",\
+  \"suggested_area\": \"reef\",\
+  \"serial_number\": \"%s\",\
+  \"sw_version\": \"SW FW version goes here\"}\
 }";
+
+
+
 
 // Json mqtt template for home assistant auto discovery of select scene widget 
 char *jsonDiscoveryDeviceSelect = "{\"name\": \"Set Scene\",\
@@ -214,7 +220,7 @@ void loop() {
     MobiusDevice device = deviceBuffer[0];
     int count = 0;
     //int scanDuration = 10; // in seconds
-    int scanDuration = 2; // in seconds
+    int scanDuration = 15; // in seconds
     while (!count) {
       count = MobiusDevice::scanForMobiusDevices(scanDuration, deviceBuffer);
     }
@@ -240,9 +246,9 @@ void loop() {
       if(device.connect()) {
         Serial.printf("INFO: Connected to: %s\n", device._device->toString().c_str());
 
-        const char* serialNumber = device.getSerialNumber().c_str();
+        const char* serialNum = device.getSerialNumber().c_str();
         Serial.print("Serial #: ");
-        Serial.println(serialNumber);
+        Serial.println(serialNum);
 
         char* modelName = getModelName(device.getSerialNumber());
         Serial.print("Model Name: ");
@@ -268,36 +274,28 @@ void loop() {
         // Home Assistant autodiscovery
         // Substitute serialNumber into jsonDiscoveryDevice
         char json[512];
-        sprintf(json, jsonDiscoveryDevice, serialNumber, serialNumber, serialNumber, deviceAddress, serialNumber, modelName, device.getManufName());
+        sprintf(json, jsonDiscoveryDevice, serialNum, serialNum, deviceAddress, serialNum, modelName, device.getManufName(), serialNum);
         Serial.printf("INFO: Device discovery message:%s\n", json);
         char deviceDiscoveryTopic[400];
-        Serial.println("=========================1================================");
-        Serial.println(serialNumber);
-        sprintf(deviceDiscoveryTopic, "homeassistant/sensor/mobius/%s/config", serialNumber);
-        Serial.println("=========================2================================");
-        Serial.println(serialNumber);
+        sprintf(deviceDiscoveryTopic, "homeassistant/sensor/mobius/%s/config", serialNum);
 
         Serial.printf("INFO: Device Discovery Topic: %s\n", deviceDiscoveryTopic);
         client.publish(deviceDiscoveryTopic, json);
 
         // Create scene select input
         char jsonSelect[512];
-        sprintf(jsonSelect, jsonDiscoveryDeviceSelect, serialNumber, serialNumber, deviceAddress, serialNumber);
-        Serial.println("=========================3================================");
-        Serial.println(serialNumber);
+        sprintf(jsonSelect, jsonDiscoveryDeviceSelect, serialNum, serialNum, deviceAddress, serialNum);
 
         Serial.printf("INFO: Device select discovery message:%s\n", jsonSelect);
         char deviceSelectDiscoveryTopic[400];
-        sprintf(deviceSelectDiscoveryTopic, "homeassistant/select/mobius/%s/config", serialNumber);
-        Serial.println("=========================4================================");
-        Serial.println(serialNumber);
+        sprintf(deviceSelectDiscoveryTopic, "homeassistant/select/mobius/%s/config", serialNum);
 
         Serial.printf("INFO: Device Select Discovery Topic: %s\n", deviceSelectDiscoveryTopic);
 
         // delaying without sleeping
         unsigned long startMillis = millis();
         while (1000 > (millis() - startMillis)) {}
-        //Need to wait some time, otherwise the select will not be created.
+        //Need to wait some time, otherwise the topics for a same device will be to close and will not update HA
         client.publish(deviceSelectDiscoveryTopic, jsonSelect);
 
         // Get current scene
@@ -306,17 +304,20 @@ void loop() {
         dtostrf(sceneId, 2, 0, sceneString);
         Serial.printf("INFO: Current scene string:%s\n", sceneString);
     
-        Serial.println("=========================5================================");
-        Serial.println(serialNumber);
         // Set sensor scene
         char deviceTopic[400];
-        sprintf(deviceTopic, "homeassistant/sensor/mobius/%s/scene/state", serialNumber);
+        sprintf(deviceTopic, "homeassistant/sensor/mobius/%s/scene/state", device.getSerialNumber().c_str());
         Serial.printf("INFO: Device Topic: %s\n", deviceTopic);
+
+        // delaying without sleeping
+        startMillis = millis();
+        while (1000 > (millis() - startMillis)) {}
+        //Need to wait some time, otherwise the topics for a same device will be to close and will not update HA
         client.publish(deviceTopic, sceneString);
 
         // Create scene state topic
         //char deviceSelectCommandDiscoveryTopic[400];
-        //sprintf(deviceSelectCommandDiscoveryTopic, "homeassistant/select/mobius/%s/scene/state", serialNumber);
+        //sprintf(deviceSelectCommandDiscoveryTopic, "homeassistant/select/mobius/%s/scene/state", serialNum);
         //client.publish(deviceSelectCommandDiscoveryTopic, sceneString);
 
         
@@ -324,7 +325,7 @@ void loop() {
 
         // Create sensor state topic
         //char deviceSensorStateDiscoveryTopic[400];
-        //sprintf(deviceSensorStateDiscoveryTopic, "homeassistant/sensor/mobius/%s/scene/state", serialNumber);
+        //sprintf(deviceSensorStateDiscoveryTopic, "homeassistant/sensor/mobius/%s/scene/state", serialNum);
         //client.publish(deviceSensorStateDiscoveryTopic, sceneString);
 
         // Update device register with device info and available scenes
