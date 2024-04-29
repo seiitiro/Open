@@ -22,6 +22,12 @@
 #include "secrets.h"
 #include <AntiDelay.h>
 #include "MobiusSerialDecoder.h"
+#include <esp_task_wdt.h>
+
+//30 seconds WDT
+#define WDT_TIMEOUT 30      //Defines the timeout value for the TWDT (30 seconds in this case).
+#define EXE_INTERVAL 300000 //Defines an execution interval (300,000 milliseconds or 5 minutes).
+
 
 AntiDelay mobiusScanTimer(0);
 
@@ -47,6 +53,7 @@ EspMQTTClient client(
 // Json mqtt template for home assistant auto discovery of mobius devices
 char *jsonDiscoveryDevice = "{\"name\": \"%s\",\
   \"unique_id\": \"%s\",\
+  \"area\": \"reef\",\
   \"icon\": \"mdi:pump\",\
   \"state_topic\": \"homeassistant/sensor/mobius/%s/scene/state\",\
   \"force_update\": \"true\",\
@@ -158,6 +165,9 @@ void onMessageReceived(const String& topic, const String& message) {
  * Main Setup method
  */
 void setup() {
+  esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
+  esp_task_wdt_add(NULL); //add current thread to WDT watch
+
   // Connect the serial port for logs
   Serial.begin(115200);
   while (!Serial);
@@ -177,7 +187,6 @@ void setup() {
 
   // Initialize the library with a useful event listener
   MobiusDevice::init(new ArduinoSerialDeviceEventListener());
-
 }
 
 /*!
@@ -194,7 +203,9 @@ void loop() {
     }
 
     // Wait for mqtt and wifi connection
-    while(!client.isConnected()){client.loop();};
+    while(!client.isConnected()){
+      client.loop();
+    };
 
     // Loop mqtt
     client.loop();
@@ -207,7 +218,8 @@ void loop() {
     while (!count) {
       count = MobiusDevice::scanForMobiusDevices(scanDuration, deviceBuffer);
     }
-
+    Serial.printf("\nINFO: Device count: %i\n", count);
+    
     // Update mqtt with device count
     // Intended for debug purposes as it shows how reliable the BLE scans are. 
     // Look in graph in mqtt explorer.
@@ -219,6 +231,8 @@ void loop() {
 
     // Loop through each device found, autoconfigure home assistant with the device, and update the current scene of the device
     for (int i = 0; i < count; i++) {
+      esp_task_wdt_reset(); //Reset WTD
+
       device = deviceBuffer[i];
       // Connect, get serialNumber and current scene
       Serial.printf("\nINFO: Connect to device number: %i\n", i);
@@ -226,7 +240,7 @@ void loop() {
       if(device.connect()) {
         Serial.printf("INFO: Connected to: %s\n", device._device->toString().c_str());
 
-        char* serialNumber = const_cast<char*>(device.getSerialNumber().c_str());
+        const char* serialNumber = device.getSerialNumber().c_str();
         Serial.print("Serial #: ");
         Serial.println(serialNumber);
 
@@ -257,17 +271,33 @@ void loop() {
         sprintf(json, jsonDiscoveryDevice, serialNumber, serialNumber, serialNumber, deviceAddress, serialNumber, modelName, device.getManufName());
         Serial.printf("INFO: Device discovery message:%s\n", json);
         char deviceDiscoveryTopic[400];
+        Serial.println("=========================1================================");
+        Serial.println(serialNumber);
         sprintf(deviceDiscoveryTopic, "homeassistant/sensor/mobius/%s/config", serialNumber);
+        Serial.println("=========================2================================");
+        Serial.println(serialNumber);
+
         Serial.printf("INFO: Device Discovery Topic: %s\n", deviceDiscoveryTopic);
         client.publish(deviceDiscoveryTopic, json);
 
         // Create scene select input
         char jsonSelect[512];
         sprintf(jsonSelect, jsonDiscoveryDeviceSelect, serialNumber, serialNumber, deviceAddress, serialNumber);
+        Serial.println("=========================3================================");
+        Serial.println(serialNumber);
+
         Serial.printf("INFO: Device select discovery message:%s\n", jsonSelect);
         char deviceSelectDiscoveryTopic[400];
         sprintf(deviceSelectDiscoveryTopic, "homeassistant/select/mobius/%s/config", serialNumber);
+        Serial.println("=========================4================================");
+        Serial.println(serialNumber);
+
         Serial.printf("INFO: Device Select Discovery Topic: %s\n", deviceSelectDiscoveryTopic);
+
+        // delaying without sleeping
+        unsigned long startMillis = millis();
+        while (1000 > (millis() - startMillis)) {}
+        //Need to wait some time, otherwise the select will not be created.
         client.publish(deviceSelectDiscoveryTopic, jsonSelect);
 
         // Get current scene
@@ -276,6 +306,8 @@ void loop() {
         dtostrf(sceneId, 2, 0, sceneString);
         Serial.printf("INFO: Current scene string:%s\n", sceneString);
     
+        Serial.println("=========================5================================");
+        Serial.println(serialNumber);
         // Set sensor scene
         char deviceTopic[400];
         sprintf(deviceTopic, "homeassistant/sensor/mobius/%s/scene/state", serialNumber);
@@ -302,13 +334,16 @@ void loop() {
         //}
         // Disconnect
         device.disconnect();
+        esp_task_wdt_reset(); //Reset WTD again after disconnecting from each device
+
       }
       else {
         Serial.println("ERROR: Failed to connect to device");
       }
     }
-
-    Serial.println("INFO: Wait for next scan in a few minutes.");
-
+    Serial.print(millis());
+    Serial.println(" - INFO: Wait for next scan in a few minutes.");
   }
+  esp_task_wdt_reset(); //Reset WTD
+
 }
