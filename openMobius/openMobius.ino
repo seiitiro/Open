@@ -20,6 +20,8 @@
 #include "EspMQTTClient.h"
 #include <string>
 #include "secrets.h"
+#include <AntiDelay.h>
+#include "MobiusSerialDecoder.h"
 
 // Configuration for wifi and mqtt
 EspMQTTClient client(
@@ -49,8 +51,8 @@ char *jsonDiscoveryDevice = "{\"name\": \"%s\",\
   \"device\" : {\
   \"identifiers\" : [  \"%s\" ],\
   \"name\": \"%s\",\
-  \"model\": \"Mobius\",\
-  \"manufacturer\": \"Ecotech\"}\
+  \"model\": \"%s\",\
+  \"manufacturer\": \"%s\"}\
 }";
 
 // Json mqtt template for home assistant auto discovery of select scene widget 
@@ -59,7 +61,7 @@ char *jsonDiscoveryDeviceSelect = "{\"name\": \"Set Scene\",\
     \"command_topic\": \"homeassistant/select/mobius/scene/%s\",\
     \"force_update\": \"true\",\
     \"options\": [\"0\", \"1\", \"Scene x\", \"Scene y\"],\
-    \"device\" : {  \"identifiers\" : [  \"%s\" ],  \"name\": \"%s\", \"model\": \"Mobius\",  \"manufacturer\": \"Ecotech\"}\
+    \"device\" : {  \"identifiers\" : [  \"%s\" ],  \"name\": \"%s\"}\
 }";
 
 
@@ -219,12 +221,21 @@ void loop() {
           if(device.connect()) {
             Serial.printf("INFO: Connected to: %s\n", device._device->toString().c_str());
 
-            // serialNumber is from byte 11
-            std::string serialNumberString = manuData.substr(11, manuData.length());
-            char serialNumber[serialNumberString.length() + 1] = {};
-            strcpy(serialNumber, serialNumberString.c_str());
-            Serial.printf("INFO: Device serial number: %s\n", serialNumber);
-          
+            char* serialNumber = const_cast<char*>(device.getSerialNumber().c_str());
+            Serial.print("Serial #: ");
+            Serial.println(serialNumber);
+
+            char* modelName = getModelName(device.getSerialNumber());
+            Serial.print("Model Name: ");
+            Serial.println( modelName );
+
+            const char* manufName = device.getManufName();
+            Serial.print("Manufacturer: ");
+            Serial.println( manufName );
+
+            Serial.print("FW Revision: ");
+            Serial.println(device.getFWRev());
+
             // Get the devices mac address. Note that this changes every reboot so likely not useful
             std::string addressString = device._device->getAddress().toString();
             char deviceAddress[addressString.length() + 1] = {};
@@ -238,7 +249,7 @@ void loop() {
             // Home Assistant autodiscovery
             // Substitute serialNumber into jsonDiscoveryDevice
             char json[512];
-            sprintf(json, jsonDiscoveryDevice, serialNumber, serialNumber, serialNumber, deviceAddress, serialNumber);
+            sprintf(json, jsonDiscoveryDevice, serialNumber, serialNumber, serialNumber, deviceAddress, serialNumber, modelName, device.getManufName());
             Serial.printf("INFO: Device discovery message:%s\n", json);
             char deviceDiscoveryTopic[400];
             sprintf(deviceDiscoveryTopic, "homeassistant/sensor/mobius/%s/config", serialNumber);
