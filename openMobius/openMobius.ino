@@ -1,4 +1,12 @@
 /*!
+ * 
+ *  TO DO
+ *    1- config MQTT topic is getting wrong information when FW Version field is added to the sprintf, unsure what is causing
+ *    2- Finish MQTT configuration to set the scene
+ *
+ *
+ *
+ *
  * Discover and Control Mobius Devices
  *
  * Establishes a wifi and mqtt connection. 
