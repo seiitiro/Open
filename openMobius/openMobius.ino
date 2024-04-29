@@ -220,7 +220,7 @@ void loop() {
     MobiusDevice device = deviceBuffer[0];
     int count = 0;
     //int scanDuration = 10; // in seconds
-    int scanDuration = 15; // in seconds
+    int scanDuration = 30; // in seconds
     while (!count) {
       count = MobiusDevice::scanForMobiusDevices(scanDuration, deviceBuffer);
     }
