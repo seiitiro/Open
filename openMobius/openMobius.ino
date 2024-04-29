@@ -262,12 +262,12 @@ void loop() {
         Serial.print("Model Name: ");
         Serial.println( modelName );
 
-        const char* manufName = device.getManufName();
+        const char* manufName = device.getManufName().c_str();
         Serial.print("Manufacturer: ");
         Serial.println( manufName );
 
         Serial.print("FW Revision: ");
-        Serial.println(device.getFWRev());
+        Serial.println(device.getFWRev().c_str());
 
         // Get the devices mac address. Note that this changes every reboot so likely not useful
         std::string addressString = device._device->getAddress().toString();
@@ -282,7 +282,7 @@ void loop() {
         // Home Assistant autodiscovery
         // Substitute serialNumber into jsonDiscoveryDevice
         char json[512];
-        sprintf(json, jsonDiscoveryDevice, serialNum, serialNum, deviceAddress, serialNum, modelName, device.getManufName(), serialNum);
+        sprintf(json, jsonDiscoveryDevice, serialNum, serialNum, deviceAddress, serialNum, modelName, device.getManufName().c_str(), serialNum);
         Serial.printf("INFO: Device discovery message:%s\n", json);
         char deviceDiscoveryTopic[400];
         sprintf(deviceDiscoveryTopic, "homeassistant/sensor/mobius/%s/config", serialNum);
