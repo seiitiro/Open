@@ -72,7 +72,7 @@ char *jsonDiscoveryDevice = "{\"name\": \"Current Scene\",\
   \"manufacturer\": \"%s\",\
   \"suggested_area\": \"reef\",\
   \"serial_number\": \"%s\",\
-  \"sw_version\": \"SW FW version goes here\"}\
+  \"sw_version\": \"%s\"}\
 }";
 
 
@@ -94,7 +94,7 @@ MobiusDevice deviceBuffer[30];
 // wifi and mqtt connection established
 void onConnectionEstablished()
 {
-  Serial.println("Connected to MQTT Broker :)");
+  Serial.println(F("Connected to MQTT Broker :)"));
 
   // Set keepalive (default is 15sec)
   client.setKeepAlive(30);
@@ -114,53 +114,53 @@ void onConnectionEstablished()
 void onMessageReceived(const String& topic, const String& message) {
   // Get serial number from the end of topic
   String serialNumberGiven = topic.substring(34);
-  Serial.printf("INFO***: Serial Number: %s\n", serialNumberGiven.c_str());
-  Serial.printf("INFO***: Set Scene is: %s\n", message);
+//  Serial.printf("INFO***: Serial Number: %s\n", serialNumberGiven.c_str());
+//  Serial.printf("INFO***: Set Scene is: %s\n", message);
 
   // Loop through devices till we match the serial number
   MobiusDevice device = deviceBuffer[0];
   int discovered = 0;
   while (discovered == 0){
-    Serial.println("INFO****: Discovered NO");
+    Serial.println(F("INFO****: Discovered NO"));
     int count = 0;
     int scanDuration = 10; // in seconds
     while (!count) {
       count = MobiusDevice::scanForMobiusDevices(scanDuration, deviceBuffer);
     }
-    Serial.printf("INFO*** Device count: %i\n", count);
+//    Serial.printf("INFO*** Device count: %i\n", count);
     for (int i = 0; i < count; i++) {
       device = deviceBuffer[i];
-      Serial.printf("INFO****: Check device: %i\n", count);
+//      Serial.printf("INFO****: Check device: %i\n", count);
       // Get manufacturer info
       std::string manuData = device._device->getManufacturerData();
 
       // Don't connect unless we have a serial number
       if (manuData.length() > 1){
         // Connect, get serialNumber and current scene          
-        Serial.printf("INFO****: Found manuData: %s\n", manuData.c_str());
+//        Serial.printf("INFO****: Found manuData: %s\n", manuData.c_str());
         // serialNumber is from byte 11
         std::string serialNumberString = manuData.substr(11, manuData.length());
         char serialNumber[serialNumberString.length() + 1] = {};
         strcpy(serialNumber, serialNumberString.c_str());
-        Serial.printf("INFO*****: Device serial number: %s\n", serialNumber);
-        Serial.printf("INFO*****: Serial number given: %s\n", serialNumberGiven.c_str());
+//        Serial.printf("INFO*****: Device serial number: %s\n", serialNumber);
+//        Serial.printf("INFO*****: Serial number given: %s\n", serialNumberGiven.c_str());
         if (strcmp(serialNumber, serialNumberGiven.c_str()) == 0){
-          Serial.printf("INFO****: MATCH!!\n");
+//          Serial.printf("INFO****: MATCH!!\n");
 
           // Connect device
           if (!device.connect()){
-            Serial.println("ERROR****: Failed to connect to device");
+            Serial.println(F("ERROR****: Failed to connect to device"));
           }
           else {
-            Serial.println("INFO****: Connected to device");
+            Serial.println(F("INFO****: Connected to device"));
           }
 
           // Set scene
           if (!device.setScene(message.toInt())){
-            Serial.println("ERROR****: Failed to set device scene");
+            Serial.println(F("ERROR****: Failed to set device scene"));
           }
           else {
-            Serial.println("INFO****: Successfully set device scene");
+            Serial.println(F("INFO****: Successfully set device scene"));
           }
 
           // Disconnect
@@ -240,7 +240,7 @@ void loop() {
     //char cstr[8];
     //sprintf(cstr, "%d", count);
     //if (!client.publish("homeassistant/sensor/mobius/discovered/count", cstr)) {
-    //  Serial.println("ERROR: failed to publish device count");
+    //  Serial.println(F("ERROR: failed to publish device count"));
     //}
 
     // Loop through each device found, autoconfigure home assistant with the device, and update the current scene of the device
@@ -254,21 +254,29 @@ void loop() {
       if(device.connect()) {
         Serial.printf("INFO: Connected to: %s\n", device._device->toString().c_str());
 
+        const char* serialNum = "e";
+        const char* modelName = "e";
+        const char* manufName = "e";
+        const char* fwRevision = "e";
+
+/*
         const char* serialNum = device.getSerialNumber().c_str();
-        Serial.print("Serial #: ");
-        Serial.println(serialNum);
-
-        char* modelName = getModelName(device.getSerialNumber());
-        Serial.print("Model Name: ");
-        Serial.println( modelName );
-
+        const char* modelName = getModelName(device.getSerialNumber());
         const char* manufName = device.getManufName().c_str();
-        Serial.print("Manufacturer: ");
-        Serial.println( manufName );
+        const char* fwRevision = device.getFWRev().c_str();
 
-        Serial.print("FW Revision: ");
-        Serial.println(device.getFWRev().c_str());
+        Serial.print(F("Serial #: "));
+        Serial.println(F(serialNum));
 
+        Serial.print(F("Model Name: "));
+        Serial.println(F( modelName ));
+
+        Serial.print(F("Manufacturer: "));
+        Serial.println(F( manufName ));
+
+        Serial.print(F("FW Revision: "));
+        Serial.println(F(fwRevision));
+*/
         // Get the devices mac address. Note that this changes every reboot so likely not useful
         std::string addressString = device._device->getAddress().toString();
         char deviceAddress[addressString.length() + 1] = {};
@@ -277,28 +285,28 @@ void loop() {
 
         // Get device name (not useful as always MOBIUS)
         //std::string deviceName = device._device->getName();
-        //Serial.printf("INFO: Device Name: %s\n", deviceName.c_str());
+        //Serial.printf(F("INFO: Device Name: %s\n"), deviceName.c_str());
 
         // Home Assistant autodiscovery
         // Substitute serialNumber into jsonDiscoveryDevice
         char json[512];
-        sprintf(json, jsonDiscoveryDevice, serialNum, serialNum, deviceAddress, serialNum, modelName, device.getManufName().c_str(), serialNum);
-        Serial.printf("INFO: Device discovery message:%s\n", json);
+        sprintf(json, jsonDiscoveryDevice, serialNum, serialNum, deviceAddress, serialNum, modelName, manufName, serialNum, fwRevision);
+//        Serial.printf("INFO: Device discovery message:%s\n", json);
         char deviceDiscoveryTopic[400];
         sprintf(deviceDiscoveryTopic, "homeassistant/sensor/mobius/%s/config", serialNum);
 
-        Serial.printf("INFO: Device Discovery Topic: %s\n", deviceDiscoveryTopic);
+//        Serial.printf("INFO: Device Discovery Topic: %s\n", deviceDiscoveryTopic);
         client.publish(deviceDiscoveryTopic, json);
 
         // Create scene select input
         char jsonSelect[512];
         sprintf(jsonSelect, jsonDiscoveryDeviceSelect, serialNum, serialNum, deviceAddress, serialNum);
 
-        Serial.printf("INFO: Device select discovery message:%s\n", jsonSelect);
+//        Serial.printf("INFO: Device select discovery message:%s\n", jsonSelect);
         char deviceSelectDiscoveryTopic[400];
         sprintf(deviceSelectDiscoveryTopic, "homeassistant/select/mobius/%s/config", serialNum);
 
-        Serial.printf("INFO: Device Select Discovery Topic: %s\n", deviceSelectDiscoveryTopic);
+//        Serial.printf("INFO: Device Select Discovery Topic: %s\n", deviceSelectDiscoveryTopic);
 
         // delaying without sleeping
         unsigned long startMillis = millis();
@@ -310,12 +318,12 @@ void loop() {
         uint16_t sceneId = device.getCurrentScene();
         char sceneString[8];
         dtostrf(sceneId, 2, 0, sceneString);
-        Serial.printf("INFO: Current scene string:%s\n", sceneString);
+//        Serial.printf("INFO: Current scene string:%s\n", sceneString);
     
         // Set sensor scene
         char deviceTopic[400];
         sprintf(deviceTopic, "homeassistant/sensor/mobius/%s/scene/state", device.getSerialNumber().c_str());
-        Serial.printf("INFO: Device Topic: %s\n", deviceTopic);
+//        Serial.printf("INFO: Device Topic: %s\n", deviceTopic);
 
         // delaying without sleeping
         startMillis = millis();
@@ -347,11 +355,11 @@ void loop() {
 
       }
       else {
-        Serial.println("ERROR: Failed to connect to device");
+        Serial.println(F("ERROR: Failed to connect to device"));
       }
     }
     Serial.print(millis());
-    Serial.println(" - INFO: Wait for next scan in a few minutes.");
+    Serial.println(F(" - INFO: Wait for next scan in a few minutes."));
   }
   esp_task_wdt_reset(); //Reset WTD
 
