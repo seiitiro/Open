@@ -254,18 +254,12 @@ void loop() {
       if(device.connect()) {
         Serial.printf("INFO: Connected to: %s\n", device._device->toString().c_str());
 
-        const char* serialNum = "e";
-        const char* modelName = "e";
-        const char* manufName = "e";
-        const char* fwRevision = "e";
-
-/*
         const char* serialNum = device.getSerialNumber().c_str();
         const char* modelName = getModelName(device.getSerialNumber());
         const char* manufName = device.getManufName().c_str();
         const char* fwRevision = device.getFWRev().c_str();
 
-        Serial.print(F("Serial #: "));
+        Serial.print("Serial #: ");
         Serial.println(F(serialNum));
 
         Serial.print(F("Model Name: "));
@@ -276,7 +270,7 @@ void loop() {
 
         Serial.print(F("FW Revision: "));
         Serial.println(F(fwRevision));
-*/
+
         // Get the devices mac address. Note that this changes every reboot so likely not useful
         std::string addressString = device._device->getAddress().toString();
         char deviceAddress[addressString.length() + 1] = {};
